@@ -1,0 +1,85 @@
+name: build-apk
+
+# Builds an installable Android APK from the latest muoibuon/mstudent-android source
+# and publishes it as a GitHub Release of this repo, so users only need the Releases link.
+on:
+  push:
+    branches: [release-apk]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  EXPO_PUBLIC_API_URL: https://mstudent.tailec1929.ts.net
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: muoibuon/mstudent-android
+          path: src
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: src
+        run: set -o pipefail; npm ci 2>&1 | tee ../build.log
+
+      - name: Expo prebuild (android)
+        working-directory: src
+        run: set -o pipefail; npx expo prebuild --platform android --clean --no-install 2>&1 | tee -a ../build.log
+
+      - name: Gradle assembleRelease
+        working-directory: src/android
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx6g
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a 2>&1 | tee -a ../../build.log
+
+      - name: Collect APK
+        id: apk
+        run: |
+          SHA=$(git -C src rev-parse --short HEAD)
+          cp src/android/app/build/outputs/apk/release/app-release.apk MStudent.apk
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          sed "s/{{SHA}}/$SHA/" release/NOTES.md > notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.apk.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: MStudent cho Android ${{ steps.apk.outputs.tag }}
+          body_path: notes.md
+          files: MStudent.apk
+          make_latest: true
+
+      - name: Save build log on failure
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan release-apk-logs
+          git rm -rfq --cached . || true
+          tail -c 200000 build.log > last-build.log || echo "no log" > last-build.log
+          git add -f last-build.log
+          git commit -qm "Build log for run ${{ github.run_number }}"
+          git push -f origin release-apk-logs
