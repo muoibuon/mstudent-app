@@ -1,5 +1,7 @@
 # MStudent — app iOS & Android (Expo SDK 58)
 
+> ⚠️ **Repo này đã được tách theo nền tảng và không còn nhận thay đổi mới.** Làm việc ở: iOS https://github.com/muoibuon/mstudent-ios · Android https://github.com/muoibuon/mstudent-android
+
 > Repo này chỉ có **app**. Backend (FastAPI, agent AI), tài liệu chung và spec: https://github.com/muoibuon/mstudent-backend
 > Quy tắc cho người và coding agent: [`AGENTS.md`](AGENTS.md). Trước khi push: `npm test && npm run typecheck && npx expo lint`.
 > Làm việc nhóm: nhánh việc tạo từ `dev`, PR vào `dev`; `master` là bản ổn định (`dev` → `master` bằng PR khi đã thử xong); backend đổi API thì cập nhật `lib/types.ts` + `lib/api.ts`.
